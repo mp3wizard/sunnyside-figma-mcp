@@ -7,6 +7,7 @@ import { Server } from "http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Logger } from "./utils/logger.js";
 import { setupPluginIntegration } from "./plugin-integration.js";
+import { hostValidationMiddleware, createBearerAuthMiddleware } from "./utils/http-security.js";
 
 let httpServer: Server | null = null;
 const transports = {
@@ -14,8 +15,25 @@ const transports = {
   sse: {} as Record<string, SSEServerTransport>,
 };
 
-export async function startHttpServer(port: number, mcpServer: McpServer): Promise<void> {
+export async function startHttpServer(
+  port: number,
+  mcpServer: McpServer,
+  bindHost: string = "127.0.0.1",
+): Promise<void> {
   const app = express();
+
+  // Do not trust X-Forwarded-* so the Host check below cannot be spoofed.
+  app.set("trust proxy", false);
+
+  // Anti-DNS-rebinding: reject any request whose Host header is not loopback.
+  // Registered first so it guards every route, including plugin endpoints.
+  app.use(hostValidationMiddleware);
+
+  // Optional bearer-token auth for the MCP/SSE endpoints. Enabled only when
+  // MCP_AUTH_TOKEN is set. Plugin endpoints rely on loopback bind + Host check
+  // since the Figma plugin cannot carry a secret without UI changes.
+  const authToken = process.env.MCP_AUTH_TOKEN ?? "";
+  const requireAuth = createBearerAuthMiddleware(authToken);
 
   // Setup plugin integration endpoints
   setupPluginIntegration(app);
@@ -24,7 +42,7 @@ export async function startHttpServer(port: number, mcpServer: McpServer): Promi
   app.use("/mcp", express.json());
 
   // Modern Streamable HTTP endpoint
-  app.post("/mcp", async (req, res) => {
+  app.post("/mcp", requireAuth, async (req, res) => {
     Logger.log("Received StreamableHTTP request");
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
     // Logger.log("Session ID:", sessionId);
@@ -119,12 +137,12 @@ export async function startHttpServer(port: number, mcpServer: McpServer): Promi
   };
 
   // Handle GET requests for server-to-client notifications via SSE
-  app.get("/mcp", handleSessionRequest);
+  app.get("/mcp", requireAuth, handleSessionRequest);
 
   // Handle DELETE requests for session termination
-  app.delete("/mcp", handleSessionRequest);
+  app.delete("/mcp", requireAuth, handleSessionRequest);
 
-  app.get("/sse", async (req, res) => {
+  app.get("/sse", requireAuth, async (req, res) => {
     Logger.log("Establishing new SSE connection");
     const transport = new SSEServerTransport("/messages", res);
     Logger.log(`New SSE connection established for sessionId ${transport.sessionId}`);
@@ -139,7 +157,7 @@ export async function startHttpServer(port: number, mcpServer: McpServer): Promi
     await mcpServer.connect(transport);
   });
 
-  app.post("/messages", async (req, res) => {
+  app.post("/messages", requireAuth, async (req, res) => {
     const sessionId = req.query.sessionId as string;
     const transport = transports.sse[sessionId];
     if (transport) {
@@ -153,11 +171,17 @@ export async function startHttpServer(port: number, mcpServer: McpServer): Promi
     }
   });
 
-  httpServer = app.listen(port, () => {
-    Logger.important(`HTTP server listening on port ${port}`);
-    Logger.log(`SSE endpoint available at http://localhost:${port}/sse`);
-    Logger.log(`Message endpoint available at http://localhost:${port}/messages`);
-    Logger.log(`StreamableHTTP endpoint available at http://localhost:${port}/mcp`);
+  httpServer = app.listen(port, bindHost, () => {
+    Logger.important(`HTTP server listening on ${bindHost}:${port}`);
+    if (!authToken) {
+      Logger.important(
+        "MCP_AUTH_TOKEN not set — endpoints protected by loopback bind + Host validation only. " +
+          "Set MCP_AUTH_TOKEN to require a bearer token on the /mcp and /sse endpoints.",
+      );
+    }
+    Logger.log(`SSE endpoint available at http://${bindHost}:${port}/sse`);
+    Logger.log(`Message endpoint available at http://${bindHost}:${port}/messages`);
+    Logger.log(`StreamableHTTP endpoint available at http://${bindHost}:${port}/mcp`);
   });
 
   process.on("SIGINT", async () => {

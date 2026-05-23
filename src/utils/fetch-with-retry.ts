@@ -1,8 +1,8 @@
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 import { Logger } from "./logger.js";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export async function fetchWithRetry<T>(url: string, options: RequestInit = {}): Promise<T> {
   try {
@@ -17,13 +17,12 @@ export async function fetchWithRetry<T>(url: string, options: RequestInit = {}):
       `[fetchWithRetry] Initial fetch failed for ${url}: ${fetchError.message}. Likely a corporate proxy or SSL issue. Attempting curl fallback.`,
     );
 
-    const curlHeaders = formatHeadersForCurl(options.headers);
-    const curlCommand = `curl -s -L ${curlHeaders.join(" ")} "${url}"`;
+    const curlArgs = formatArgsForCurl(options.headers, url);
 
     try {
-      // Fallback to curl for  corporate networks that have proxies that sometimes block fetch
-      Logger.log(`[fetchWithRetry] Executing curl command: ${curlCommand}`);
-      const { stdout, stderr } = await execAsync(curlCommand);
+      // Fallback to curl for corporate networks that have proxies that sometimes block fetch
+      Logger.log(`[fetchWithRetry] Executing curl with args for ${url}`);
+      const { stdout, stderr } = await execFileAsync("curl", curlArgs);
 
       if (stderr) {
         // curl often outputs progress to stderr, so only treat as error if stdout is empty
@@ -56,29 +55,25 @@ export async function fetchWithRetry<T>(url: string, options: RequestInit = {}):
 }
 
 /**
- * Converts HeadersInit to an array of curl header arguments.
- * @param headers Headers to convert.
- * @returns Array of strings, each a curl -H argument.
+ * Builds a safe argv array for execFile("curl", args) — no shell interpolation.
+ * Each header becomes two separate elements ["-H", "key: value"] so values
+ * are never parsed as shell tokens.
  */
-function formatHeadersForCurl(headers: HeadersInit | undefined): string[] {
-  if (!headers) {
-    return [];
-  }
+function formatArgsForCurl(headers: HeadersInit | undefined, url: string): string[] {
+  const args: string[] = ["-s", "-L"];
 
-  const curlHeaders: string[] = [];
+  const addHeader = (key: string, value: string) => {
+    args.push("-H", `${key}: ${value}`);
+  };
 
   if (headers instanceof Headers) {
-    headers.forEach((value, key) => {
-      curlHeaders.push(`-H "${key}: ${value}"`);
-    });
+    headers.forEach((value, key) => addHeader(key, value));
   } else if (Array.isArray(headers)) {
-    headers.forEach(([key, value]) => {
-      curlHeaders.push(`-H "${key}: ${value}"`);
-    });
-  } else {
-    Object.entries(headers).forEach(([key, value]) => {
-      curlHeaders.push(`-H "${key}: ${value}"`);
-    });
+    (headers as [string, string][]).forEach(([key, value]) => addHeader(key, value));
+  } else if (headers) {
+    Object.entries(headers as Record<string, string>).forEach(([key, value]) => addHeader(key, value));
   }
-  return curlHeaders;
+
+  args.push("--", url);
+  return args;
 }

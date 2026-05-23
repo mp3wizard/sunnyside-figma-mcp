@@ -85,7 +85,7 @@ export function setupPluginIntegration(app: express.Application): void {
         return callback(null, true);
       }
 
-      return callback(null, true); // Allow all origins for development
+      return callback(new Error(`CORS: origin '${origin}' not allowed`));
     },
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

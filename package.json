@@ -1,15 +1,19 @@
 {
-  "name": "figma-developer-mcp",
+  "name": "@mp3wizard/sunnyside-figma-mcp",
   "version": "0.4.2",
-  "description": "Model Context Protocol server for Figma integration",
+  "description": "Figma-to-code MCP server with Dev Mode plugin bridge. Fork of Sunnyside Figma Context MCP (tercumantanumut/sunnysideFigma-Context-MCP), republished for development use under the Sunnyside Proprietary License.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "figma-developer-mcp": "dist/cli.js"
+    "sunnyside-figma-mcp": "dist/cli.js"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsup --dts",
@@ -41,9 +45,9 @@
   "packageManager": "pnpm@10.10.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GLips/Figma-Context-MCP.git"
+    "url": "git+https://github.com/tercumantanumut/sunnysideFigma-Context-MCP.git"
   },
-  "homepage": "https://www.framelink.ai",
+  "homepage": "https://github.com/tercumantanumut/sunnysideFigma-Context-MCP",
   "keywords": [
     "figma",
     "mcp",
@@ -60,9 +64,8 @@
     "cross-env": "^7.0.3",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^4.1.1",
     "remeda": "^2.20.1",
-    "vercel": "^44.0.0",
     "yargs": "^17.7.2",
     "zod": "^3.25.76"
   },
@@ -84,5 +87,15 @@
     "tsup": "^8.4.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "path-to-regexp@0.1": "0.1.13",
+      "path-to-regexp@^8": "8.4.0",
+      "qs@^6.13": "6.15.2",
+      "hono": ">=4.12.18",
+      "fast-uri": ">=3.1.2",
+      "ip-address": ">=10.1.1"
+    }
   }
 }

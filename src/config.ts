@@ -7,11 +7,13 @@ import type { FigmaAuthOptions } from "./services/figma.js";
 interface ServerConfig {
   auth: FigmaAuthOptions;
   port: number;
+  bindHost: string;
   outputFormat: "yaml" | "json";
   configSources: {
     figmaApiKey: "cli" | "env";
     figmaOAuthToken: "cli" | "env" | "none";
     port: "cli" | "env" | "default";
+    bindHost: "cli" | "env" | "default";
     outputFormat: "cli" | "env" | "default";
     envFile: "cli" | "default";
   };
@@ -27,6 +29,7 @@ interface CliArgs {
   "figma-oauth-token"?: string;
   env?: string;
   port?: number;
+  "bind-host"?: string;
   json?: boolean;
 }
 
@@ -49,6 +52,10 @@ export function getServerConfig(isStdioMode: boolean): ServerConfig {
       port: {
         type: "number",
         description: "Port to run the server on",
+      },
+      "bind-host": {
+        type: "string",
+        description: "Network interface to bind the HTTP server to (default: 127.0.0.1)",
       },
       json: {
         type: "boolean",
@@ -83,11 +90,13 @@ export function getServerConfig(isStdioMode: boolean): ServerConfig {
 
   const config: Omit<ServerConfig, "auth"> = {
     port: 3333,
+    bindHost: "127.0.0.1",
     outputFormat: "yaml",
     configSources: {
       figmaApiKey: "env",
       figmaOAuthToken: "none",
       port: "default",
+      bindHost: "default",
       outputFormat: "default",
       envFile: envFileSource,
     },
@@ -120,6 +129,15 @@ export function getServerConfig(isStdioMode: boolean): ServerConfig {
   } else if (process.env.PORT) {
     config.port = parseInt(process.env.PORT, 10);
     config.configSources.port = "env";
+  }
+
+  // Handle BIND_HOST — defaults to loopback so the server is not exposed network-wide
+  if (argv["bind-host"]) {
+    config.bindHost = argv["bind-host"];
+    config.configSources.bindHost = "cli";
+  } else if (process.env.BIND_HOST) {
+    config.bindHost = process.env.BIND_HOST;
+    config.configSources.bindHost = "env";
   }
 
   // Handle JSON output format
@@ -155,6 +173,7 @@ export function getServerConfig(isStdioMode: boolean): ServerConfig {
       console.log("- Authentication Method: Personal Access Token (X-Figma-Token)");
     }
     console.log(`- PORT: ${config.port} (source: ${config.configSources.port})`);
+    console.log(`- BIND_HOST: ${config.bindHost} (source: ${config.configSources.bindHost})`);
     console.log(
       `- OUTPUT_FORMAT: ${config.outputFormat} (source: ${config.configSources.outputFormat})`,
     );

@@ -30,7 +30,7 @@ export async function startServer(): Promise<void> {
     await server.connect(transport);
   } else {
     console.log(`Initializing Figma MCP Server in HTTP mode on port ${config.port}...`);
-    await startHttpServer(config.port, server);
+    await startHttpServer(config.port, server, config.bindHost);
   }
 }
 

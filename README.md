@@ -2,6 +2,17 @@
 
 # Sunnyside Figma MCP
 
+> **Fork notice / attribution.** This package (`@mp3wizard/sunnyside-figma-mcp`) is a redistribution of
+> **Sunnyside Figma Context MCP** by Sunnyside Software (Umut TAN — [@tercumantanumut](https://github.com/tercumantanumut)),
+> original source: <https://github.com/tercumantanumut/sunnysideFigma-Context-MCP>.
+> It is published for development use only under the **Sunnyside Proprietary Software License** (see [LICENSE](./LICENSE)) —
+> commercial use is prohibited without written permission from Sunnyside Software, and this notice must be retained.
+
+> **Security hardening in this fork.** This fork contains additional security fixes that are **not** in the
+> upstream repository — an enforced CORS allowlist, command-injection-safe HTTP fetch fallback, loopback-only
+> server binding, Host-header validation, optional bearer-token auth, and dependency hardening. See the full
+> writeup (findings, fixes, verification, and remaining items) in [`security report/SECURITY-REPORT.md`](./security%20report/SECURITY-REPORT.md).
+
 A Model Context Protocol (MCP) server that turns Figma designs into production code. It ships with a companion Figma plugin so LLM clients can read the layer you're actually looking at, extract pixel-perfect CSS and design tokens, and generate React / Tailwind / styled-components output — all from a natural-language prompt.
 
 Two data paths are supported:
