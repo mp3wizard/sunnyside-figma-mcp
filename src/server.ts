@@ -17,7 +17,7 @@ const transports = {
 
 export async function startHttpServer(
   port: number,
-  mcpServer: McpServer,
+  createMcpServer: () => McpServer,
   bindHost: string = "127.0.0.1",
 ): Promise<void> {
   const app = express();
@@ -70,6 +70,10 @@ export async function startHttpServer(
         }
       };
       // TODO? There semes to be an issue—at least in Cursor—where after a connection is made to an HTTP Streamable endpoint, SSE connections to the same Express server fail with "Received a response for an unknown message ID"
+      // A fresh server instance per session: the MCP SDK forbids connecting one
+      // McpServer to multiple transports. Tool state (plugin buffer) is module-level
+      // so all sessions still share the same extraction data.
+      const mcpServer = createMcpServer();
       await mcpServer.connect(transport);
     } else {
       // Invalid request
@@ -95,7 +99,10 @@ export async function startHttpServer(
       );
       progressInterval = setInterval(async () => {
         Logger.log("Sending progress notification", progress);
-        await mcpServer.server.notification({
+        // Send via the transport directly: the per-session McpServer instance is
+        // not in scope here (and absent on reused sessions).
+        await transport.send({
+          jsonrpc: "2.0",
           method: "notifications/progress",
           params: {
             progress,
@@ -154,6 +161,8 @@ export async function startHttpServer(
       delete transports.sse[transport.sessionId];
     });
 
+    // Fresh server instance per SSE connection (see /mcp note above).
+    const mcpServer = createMcpServer();
     await mcpServer.connect(transport);
   });
 

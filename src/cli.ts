@@ -16,10 +16,13 @@ export async function startServer(): Promise<void> {
 
   const config = getServerConfig(isStdioMode);
 
-  const server = createServer(config.auth, {
-    isHTTP: !isStdioMode,
-    outputFormat: config.outputFormat,
-  });
+  // Factory: the MCP SDK forbids connecting one server to multiple transports,
+  // so HTTP/SSE mode needs a fresh instance per session (see server.ts).
+  const makeServer = () =>
+    createServer(config.auth, {
+      isHTTP: !isStdioMode,
+      outputFormat: config.outputFormat,
+    });
 
   if (isStdioMode) {
     // In STDIO mode, only connect via stdio transport
@@ -27,10 +30,10 @@ export async function startServer(): Promise<void> {
 
     // Connect STDIO transport for MCP communication
     const transport = new StdioServerTransport();
-    await server.connect(transport);
+    await makeServer().connect(transport);
   } else {
     console.log(`Initializing Figma MCP Server in HTTP mode on port ${config.port}...`);
-    await startHttpServer(config.port, server, config.bindHost);
+    await startHttpServer(config.port, makeServer, config.bindHost);
   }
 }
 
